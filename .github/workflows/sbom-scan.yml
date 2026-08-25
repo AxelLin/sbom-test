@@ -1,23 +1,29 @@
-name: Daily ESP-IDF SBOM Check
+name: Daily ESP-IDF SBOM Check & Commit
 
 on:
   schedule:
-    # 每天 UTC 時間凌晨 2:00 執行 (台灣時間上午 10:00)
     - cron: '0 2 * * *'
-  workflow_dispatch: # 允許在 GitHub 網頁上手動觸發，方便測試
+  workflow_dispatch:
+
+# ❗ 關鍵設定 1：必須賦予 GITHUB_TOKEN 寫入權限，才能 Push 程式碼
+permissions:
+  contents: write
 
 jobs:
-  check-sbom:
+  check-and-commit:
     runs-on: ubuntu-latest
 
     steps:
       - name: 📥 下載程式碼
         uses: actions/checkout@v4
+        with:
+          # 此設定確保能拿到完整的 Git 歷史，以便順利 Commit
+          fetch-depth: 0 
 
       - name: 🐍 設定 Python 環境
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # 建議使用 3.8 以上版本
+          python-version: '3.10'
 
       - name: 📦 安裝 esp-idf-sbom
         run: |
@@ -25,13 +31,17 @@ jobs:
           pip install esp-idf-sbom
 
       - name: 🔍 執行 SBOM 弱點檢查並輸出報告
-        # 請將 path/to/your/project.spdx 替換為你實際的 SBOM 檔案路徑
+        # 加入 continue-on-error: true，確保就算掃描發現漏洞（回傳錯誤碼），也會繼續執行下一步去 Commit 檔案
+        continue-on-error: true 
         run: |
           esp-idf-sbom check proj/test.spdx.json --output-file vulnerability-report.csv
 
-      - name: 💾 上傳報告
-        if: always() # 確保即使檢查失敗（發現漏洞）也能上傳報告
-        uses: actions/upload-artifact@v4
+      # ❗ 關鍵設定 2：將產生的 CSV 檔案 Commit 並 Push 回 Repo
+      - name: 💾 自動 Commit 並 Push 報告
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          name: sbom-vulnerability-report
-          path: vulnerability-report.csv
+          commit_message: "chore: 自動更新 SBOM 弱點掃描報告"
+          file_pattern: vulnerability-report.csv
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
+          commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
