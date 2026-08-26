@@ -36,7 +36,7 @@ jobs:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           # ❗ 請務必將下方的 path/to/your/project.spdx 替換成你真實的檔案路徑
-          esp-idf-sbom check path/to/your/project.spdx --output-file vulnerability-report.csv
+          esp-idf-sbom check proj/test.spdx.json --output-file vulnerability-report.csv
 
       - name: 💾 自動 Commit 並 Push 報告
         uses: stefanzweifel/git-auto-commit-action@v5
