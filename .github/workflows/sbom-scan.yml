@@ -33,7 +33,7 @@ jobs:
         continue-on-error: true 
         env:
           # 這裡嚴格保持 2 個空格的縮排，讀取你設定在 Secrets 的 API Key
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          NVDAPIKEY: ${{ secrets.NVD_API_KEY }}
         run: |
           # ❗ 請務必將下方的 path/to/your/project.spdx 替換成你真實的檔案路徑
           esp-idf-sbom check proj/test.spdx.json --output-file vulnerability-report.csv
