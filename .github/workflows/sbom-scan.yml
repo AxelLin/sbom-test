@@ -33,6 +33,8 @@ jobs:
       - name: 🔍 執行 SBOM 弱點檢查並輸出報告
         # 加入 continue-on-error: true，確保就算掃描發現漏洞（回傳錯誤碼），也會繼續執行下一步去 Commit 檔案
         continue-on-error: true 
+        env: |
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           esp-idf-sbom check proj/test.spdx.json --output-file vulnerability-report.csv
 
