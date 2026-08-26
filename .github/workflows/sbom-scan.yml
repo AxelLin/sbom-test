@@ -1,13 +1,12 @@
-name: Daily ESP-IDF SBOM Check & Commit
+name: Daily ESP-IDF SBOM Batch Check & Commit
 
 on:
   schedule:
-    # 每天 UTC 18:00 執行 (台灣時間凌晨 02:00)
     - cron: '0 18 * * *'
-  workflow_dispatch: # 允許手動觸發
+  workflow_dispatch:
 
 permissions:
-  contents: write # 允許 GitHub Actions 將產生的報告 Push 回去
+  contents: write
 
 jobs:
   check-and-commit:
@@ -29,20 +28,45 @@ jobs:
           python -m pip install --upgrade pip
           pip install esp-idf-sbom
 
-      - name: 🔍 執行 SBOM 弱點檢查並輸出報告
+      - name: 🔍 批次執行 SBOM 弱點檢查並產出報告
         continue-on-error: true 
         env:
-          # 這裡嚴格保持 2 個空格的縮排，讀取你設定在 Secrets 的 API Key
           NVDAPIKEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          # ❗ 請務必將下方的 path/to/your/project.spdx 替換成你真實的檔案路徑
-          esp-idf-sbom check proj/test.spdx.json --output-file vulnerability-report.csv
+          # 尋找所有在 release/*/*.spdx.json 的檔案
+          for sbom_file in release/*/*.spdx.json; do
+            
+            # 確保檔案存在 (防呆機制：如果路徑下沒有檔案，直接略過)
+            [ -e "$sbom_file" ] || continue
+            
+            # 解析路徑 (例如：sbom_file = release/v1.0/project.spdx.json)
+            dir_path=$(dirname "$sbom_file")               # 取得路徑: release/v1.0
+            sub_dir=$(basename "$dir_path")                # 取得子資料夾: v1.0
+            base_name=$(basename "$sbom_file" .spdx.json)  # 取得不含副檔名的檔名: project
+            
+            # 建立對應的輸出資料夾: scan_result/v1.0
+            out_dir="scan_result/$sub_dir"
+            mkdir -p "$out_dir"
+            
+            # 設定輸出檔案路徑: scan_result/v1.0/project-cve-report.txt
+            out_file="$out_dir/${base_name}-cve-report.txt"
+            
+            echo "========================================="
+            echo "🔎 正在掃描: $sbom_file"
+            echo "📝 輸出至: $out_file"
+            
+            # 執行掃描指令。
+            # 加上 || true 確保就算這個檔案發現漏洞 (exit code 1)，迴圈也會繼續掃描下一個檔案而不會中斷！
+            esp-idf-sbom check "$sbom_file" --output-file "$out_file" || true
+            
+          done
 
       - name: 💾 自動 Commit 並 Push 報告
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: 自動更新 SBOM 弱點掃描報告"
-          file_pattern: vulnerability-report.csv
+          commit_message: "chore: 自動更新 SBOM 批次掃描報告"
+          # 這裡改成掃描整個 scan_result 資料夾底下的所有變動
+          file_pattern: 'scan_result/**'
           commit_user_name: "github-actions[bot]"
           commit_user_email: "github-actions[bot]@users.noreply.github.com"
           commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
